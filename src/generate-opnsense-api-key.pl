@@ -24,7 +24,7 @@ my %opts = (
     H => "192.168.1.1",                     # OPNsense host (host or host:port)
     u => "root",                            # OPNsense username
     p => "opnsense",                        # OPNsense password
-    f => "/root/.opnsense-api-key.json",    # Output file
+    f => "/root/keys/.opnsense-api-key.json",    # Output file
     q => 0,                                 # Quiet mode
 );
 getopts('H:u:p:f:q', \%opts);

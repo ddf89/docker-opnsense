@@ -136,6 +136,7 @@ post_opnsense_ready() {
         log_action_msg "Skip generating the API key for the root user: (already exists)"
     else
         log_action_begin_msg "Generating the API key for the root user"
+        mkdir -p "$(dirname "$OPNSENSE_API_KEY_FILE")"
         @API_KEY_GENERATOR_PATH@ -H "$lan_addr4" -f "$OPNSENSE_API_KEY_FILE" -q
         log_action_end_msg $?
     fi
