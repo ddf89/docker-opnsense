@@ -132,12 +132,16 @@ post_opnsense_ready() {
     echo -e "$lan_addr4\t$hostname ${hostname%%.*}" | tee -a /etc/hosts > /dev/null
     log_action_end_msg $?
     
-    if [ -e "$OPNSENSE_API_KEY_FILE" ]; then
+    if [ -e " /root/.my-api-key" ]; then
+        cp /root/.my-api-key "$OPNSENSE_API_KEY_FILE"
         log_action_msg "Skip generating the API key for the root user: (already exists)"
     else
         log_action_begin_msg "Generating the API key for the root user"
         mkdir -p "$(dirname "$OPNSENSE_API_KEY_FILE")"
-        @API_KEY_GENERATOR_PATH@ -H "$lan_addr4" -f "$OPNSENSE_API_KEY_FILE" -q
+        /opt/qemu-opnsense/generate-api-key -H "$lan_addr4" -f "$OPNSENSE_API_KEY_FILE" -q
+        if [ -e "$OPNSENSE_API_KEY_FILE" ]; then
+            cp  "$OPNSENSE_API_KEY_FILE" /root/.my-api-key
+        fi
         log_action_end_msg $?
     fi
 
