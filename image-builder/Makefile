@@ -6,12 +6,16 @@ PATCH_VERSION=	$(word 3,$(subst ., ,$(VERSION)))
 image_tag=	$(1)-image
 IMAGE_TAG=	$(call image_tag,$(VERSION))
 
-all: builder image
+all: refresh-mirrors builder image
 
 .PHONY: \
-	builder image build-builder push-builder build-base-image push-base-imgage \
+	refresh-mirrors builder image build-builder push-builder build-base-image push-base-imgage \
 	build-update-image push-update-image create-insecure-builder \
 	delete-insecure-builder do-build-update-image do-push-update-image
+
+refresh-mirrors: 
+	@echo "Fetching mirrors..."
+	@perl update-mirrors.pl
 
 test: IMAGE_TAG = $(call image_tag,$(SERIES))
 test:
@@ -24,7 +28,7 @@ test:
 
 src/* Dockerfile.builder: builder
 builder: $(if $(PUSH),push,build)-builder
-build-builder:
+build-builder: refresh-mirrors
 	@echo "Building image builder"
 	@docker build . -f Dockerfile.builder -t $(REPO):$(BUILDER_TAG)
 push-builder: build-builder

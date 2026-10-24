@@ -1,0 +1,5 @@
+http://quantum-mirror.hu/mirrors/pub/opnsense
+https://opnsense-mirror.hiho.ch
+https://mirror-opnsense.serverbase.ch
+http://mirror.venturasystems.tech/opnsense
+http://mirror.marwan.ma/opnsense

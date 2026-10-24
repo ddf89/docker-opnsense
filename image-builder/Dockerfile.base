@@ -1,4 +1,4 @@
-FROM koichirok/docker-opnsense:image-builder as builder
+FROM ghcr.io/ddf89/docker-opnsense:image-builder AS builder
 
 ARG OPNSENSE_VERSION
 
@@ -28,7 +28,7 @@ RUN test "$OPNSENSE_VERSION" \
     && echo "done." \
     && rm -f /tmp/*
 
-FROM scratch as qemu-image
+FROM scratch AS qemu-image
 
 ARG OPNSENSE_VERSION
 

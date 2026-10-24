@@ -4,8 +4,21 @@ include mk/common.mk
 
 all: build
 
+docker-login: SHELL := /bin/bash
 docker-login:
-	@docker login
+ifndef GH_TOKEN
+	$(error GH_TOKEN is not set, can't login to image repo)
+else
+	@true
+endif
+
+ifndef USER
+	$(error USER is not set, can't login to image repo)
+else
+	@true
+endif
+
+	@docker login ghcr.io -u ${USER} --password-stdin <<< ${GH_TOKEN}
 
 builder:
 	@make -C image-builder builder

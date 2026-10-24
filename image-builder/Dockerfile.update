@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1-labs
 ARG OPNSENSE_SERIES
-FROM koichirok/docker-opnsense:${OPNSENSE_SERIES}-image as base-image
+FROM ghcr.io/ddf89/docker-opnsense:${OPNSENSE_SERIES}-image AS base-image
 
-FROM koichirok/docker-opnsense:image-builder as builder
+FROM ghcr.io/ddf89/docker-opnsense:image-builder AS builder
 
 ARG OPNSENSE_VERSION
 ARG WITH_FASTEST_MIRROR="yes"

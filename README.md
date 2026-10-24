@@ -21,7 +21,7 @@ docker run --rm -it \
     --device /dev/kvm \
     --cap_add NET_ADMIN \
     -p 10443:443 \
-    koichirok/docker-opnsense:24.1.3
+    ghcr.io/ddf89/docker-opnsense:24.1.3
 ```
 
 Via `docker-compose.yml`:
@@ -30,7 +30,7 @@ Via `docker-compose.yml`:
 version: "3"
 services:
   opnsense:
-    image: koichirok/docker-opnsense:24.1.3
+    image: ghcr.io/ddf89/docker-opnsense:24.1.3
     devices:
       - /dev/kvm
     # device_cgroup_rules:

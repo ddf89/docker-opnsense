@@ -53,7 +53,7 @@ build_release_image_url() {
     : "${opt_t:="nano"}"
     : "${opt_a:="amd64"}"
     : "${opt_m:="$(chose_fastest_mirror)"}"
-    echo "${opt_m}/releases/$(get_product_series "$version")/$(build_release_image_name "${version}" -t "${opt_t}" -a "${opt_a}").bz2"
+    echo "${opt_m%/}/releases/$(get_product_series "$version")/$(build_release_image_name "${version}" -t "${opt_t}" -a "${opt_a}").bz2"
 }
 
 build_release_checksum_url() {
@@ -63,5 +63,5 @@ build_release_checksum_url() {
     getopts_std "m:a:" "$@"
     : "${opt_a:="amd64"}"
     : "${opt_m:="$(chose_fastest_mirror)"}"
-    echo "${opt_m}/releases/${series}/OPNsense-${series}-checksums-${opt_a}.sha256"
+    echo "${opt_m%/}/releases/${series}/OPNsense-${series}-checksums-${opt_a}.sha256"
 }

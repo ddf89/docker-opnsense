@@ -1,5 +1,5 @@
 ARG OPNSENSE_VERSION
-FROM koichirok/docker-opnsense:${OPNSENSE_VERSION}-image AS opnsense-image
+FROM ghcr.io/ddf89/docker-opnsense:${OPNSENSE_VERSION}-image AS opnsense-image
 
 FROM debian:trixie-slim
 
