@@ -1,7 +1,7 @@
 version: "3"
 services:
   opnsense:
-    image: ghcr.io/ddf89/docker-opnsense:24.1.3
+    image: ghcr.io/ddf89/docker-opnsense:26.7
     #devices:
     #  - /dev/kvm
     #  - /dev/net/tun

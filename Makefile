@@ -48,4 +48,4 @@ lint:
 	@hadolint Dockerfile	
 
 clean:
-	@rm -f Dockerfile
+	@rm -f Dockerfile src/entrypoint.sh src/qemu-opnsense-init.sh image-builders/src/mirrors.txt

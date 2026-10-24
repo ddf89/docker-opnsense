@@ -1,13 +1,27 @@
 #!/usr/bin/env perl
+#
+# Generate an API key/secret for an OPNsense user (default: root).
+#
+# Targets the MVC user manager (System > Access > Users, /ui/auth/user).
+# The legacy system_usermanager.php page is gone, so instead of scraping the
+# user edit page we log in with a web session and call the API endpoint that
+# the new UI itself uses:
+#
+#   POST /api/auth/user/add_api_key/<username>
+#   -> {"result":"ok","hostname":"...","key":"...","secret":"..."}
+#
+# Session-authenticated API calls need the CSRF token the UI injects into its
+# pages (X-CSRFToken header), so we scrape that from the page first.
 
 use strict;
 use warnings;
 use WWW::Mechanize ();
 use Getopt::Std;
-use HTML::TreeBuilder;
+use JSON::PP ();
+use URI::Escape qw(uri_escape);
 
 my %opts = (
-    H => "192.168.1.1",                     # OPNsense IP address
+    H => "192.168.1.1",                     # OPNsense host (host or host:port)
     u => "root",                            # OPNsense username
     p => "opnsense",                        # OPNsense password
     f => "/root/.opnsense-api-key.json",    # Output file
@@ -15,100 +29,105 @@ my %opts = (
 );
 getopts('H:u:p:f:q', \%opts);
 
-sub trim {
-    my $str = shift;
-    $str =~ s/^\s+|\s+$//g;
-    return $str;
-}
+my $base = "https://$opts{H}";
 
-sub trim_and_unquote {
-    my $str = trim(shift);
-    $str =~ s/^(\\?['"])//;
-    $str =~ s/$1$//;
-    return $str;
-}
-
-
-sub open_system_usermanager {
+sub login {
     my $mech = shift;
-    $mech->get("https://$opts{H}/");
 
-    if ($mech->title() eq "Login | OPNsense") {
-        $mech->submit_form(
-            form_name => 'iform',
-            fields    => {
-                usernamefld => $opts{u},
-                passwordfld => $opts{p},
-            },
-            button => 'login',
-        );
+    $mech->get("$base/");
+
+    # Don't rely on the page title or form name; the login form is the one
+    # with username + password fields. Hidden fields (CSRF) are carried over
+    # by Mechanize automatically.
+    my $form = $mech->form_with_fields(qw(usernamefld passwordfld));
+    if ($form) {
+        $mech->field(usernamefld => $opts{u});
+        $mech->field(passwordfld => $opts{p});
+        if ($form->find_input('login', 'submit')) {
+            $mech->click('login');
+        }
+        else {
+            $mech->submit();
+        }
     }
-    $mech->get("https://$opts{H}/system_usermanager.php");
-    $mech->title() =~ /^Users \| Access \| System \| /
-      || die "Failed to open \"System: Access: Users\" page: login failed\n";
+
+    # Open the new user manager; if we get the login form again, login failed.
+    $mech->get("$base/ui/auth/user");
+    die "Login failed (still seeing the login form)\n"
+      if $mech->form_with_fields(qw(usernamefld passwordfld));
 }
 
-sub open_system_usermanager_edit_page_for_user {
-    my ($mech, $user) = @_;
+sub find_csrf_header {
+    my $html = shift;
 
-    my $tree = HTML::TreeBuilder->new_from_content($mech->content());
-
-    # Find the link to edit the $user.
-    # These links are in the last column of the table and
-    # the user name is in the first column.
-    my @links = $tree->look_down(
-        _tag => 'a',
-        href => qr/system_usermanager\.php\?act=edit&userid=\d+/
-    );
-    for my $link (@links) {
-        my $row = $link->parent->parent;
-        next if ($row->tag() ne 'tr');
-
-        my @cells = $row->find_by_tag_name('td');
-        next if (trim($cells[0]->as_trimmed_text()) ne $user);
-
-        $mech->get($link->attr('href'));
-        return;
+    # $.ajaxSetup({ beforeSend: function (xhr) {
+    #     xhr.setRequestHeader("X-CSRFToken", "...") } })
+    while ($html =~ /setRequestHeader\(\s*(["'])(.+?)\1\s*,\s*(["'])(.+?)\3\s*\)/g) {
+        my ($name, $value) = ($2, $4);
+        next unless lc($name) eq 'x-csrftoken';
+        $value =~ s{\\/}{/}g;    # un-escape JSON-style slashes
+        return ($name, $value);
     }
-    die "Failed to find link to edit user $user\n";
+
+    # Fallback: headers: { "X-CSRFToken": "..." }
+    if ($html =~ /["'](X-CSRFToken)["']\s*:\s*["']([^"']+)["']/i) {
+        my ($name, $value) = ($1, $2);
+        $value =~ s{\\/}{/}g;
+        return ($name, $value);
+    }
+    return;
 }
 
 sub generate_api_key {
     my $mech = shift;
-    $mech->uri() =~ /\buserid=(\d+)/ || die "Failed to find userid in URL\n";
-    my $userid = $1;
 
-    my $tree = HTML::TreeBuilder->new_from_content($mech->content());
+    my ($name, $value) = find_csrf_header($mech->content());
+    die "Failed to find the X-CSRFToken header in the page; "
+      . "is this a recent OPNsense with the MVC user manager?\n"
+      unless defined $name;
 
-    my @scripts = map { my @c = $_->content_list(); @c }
-      $tree->look_down(_tag => 'script', src => undef);
+    $mech->add_header(
+        $name              => $value,
+        'X-Requested-With' => 'XMLHttpRequest',
+        'Accept'           => 'application/json',
+    );
 
-    # Generating an API key requires simulating an XHR request, as the key is
-    # created using JavaScript. OPNsense includes a CSRF token in the
-    # X-CSRFToken header with the XHR, which we need to collect and set in the
-    # $mech object. As this is the final request in this script, there's no
-    # need to reset the headers afterwards.
-    for my $script (@scripts) {
-        if (ref $script ne '') {
-            print STDERR "WARN: Unexpected script content: $script\n";
-            next;
-        }
-        if ($script =~ /setRequestHeader\((.+?),(.+?)\)/mg) {
-            my ($name, $value) =
-              (trim_and_unquote($1), trim_and_unquote($2));
-            $mech->add_header($name, $value);
-        }
-    }
-    $mech->post($mech->uri(), {act => 'newApiKey', userid => $userid});
-    $mech->save_content($opts{f});
+    my $url = "$base/api/auth/user/add_api_key/" . uri_escape($opts{u});
+    my $res = eval {
+        $mech->post(
+            $url,
+            'Content-Type' => 'application/json',
+            Content        => '{}',
+        );
+    };
+    die "API request to $url failed: " . ($@ || $mech->status()) . "\n"
+      unless $res && $res->is_success;
+
+    my $body = $res->decoded_content;
+    my $data = eval { JSON::PP->new->decode($body) };
+    die "Unexpected response from $url:\n$body\n"
+      unless ref $data eq 'HASH'
+      && ($data->{result} // '') eq 'ok'
+      && defined $data->{key}
+      && defined $data->{secret};
+
+    # The secret is only shown once, so keep the file private.
+    my $old_umask = umask(0077);
+    open(my $fh, '>', $opts{f}) || die "Cannot write $opts{f}: $!\n";
+    print $fh $body, "\n";
+    close($fh) || die "Cannot write $opts{f}: $!\n";
+    umask($old_umask);
+    chmod 0600, $opts{f};
+
     print "API key saved to $opts{f}\n" unless $opts{q};
 }
 
 sub main {
     my $mech = WWW::Mechanize->new(
-        ssl_opts => {SSL_verify_mode => 0, verify_hostname => 0},);
-    open_system_usermanager($mech);
-    open_system_usermanager_edit_page_for_user($mech, $opts{u});
+        ssl_opts => {SSL_verify_mode => 0, verify_hostname => 0},
+        autocheck => 1,
+    );
+    login($mech);
     generate_api_key($mech);
     exit 0;
 }
