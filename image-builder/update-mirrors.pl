@@ -26,6 +26,7 @@ if (-e $exclusion_file) {
         chomp $line;
         $line =~ s/\r$//;
         next if $line =~ /^\s*(#|$)/;
+        $excluded{ normalize($line) } = 1;
     }
     close $efh;
 }
